@@ -6,12 +6,21 @@ use Inquirer\Entity\ConversationItem;
 use Inquirer\Entity\Option;
 use Inquirer\Factory;
 
+/**
+ * Class Chat
+ * @package Inquirer
+ */
 class Chat
 {
     private $id;
 
     /** @var Storage */
     private $storage;
+
+    /**
+     * @var int
+     */
+    private $totalScore = 0;
 
     public function __construct($id, $storage)
     {
@@ -43,6 +52,8 @@ class Chat
      */
     public function getCurrentConversationItem(): ConversationItem
     {
+        $this->storage->get()->testItem = 1;
+
         foreach ($this->storage->get()->conversation as $item) {
             if (isset($item->current) && $item->current) {
                 if (isset($item->action)) {
@@ -53,6 +64,8 @@ class Chat
                             }
                             Registry::getInstance()->getLog()->info("Summarize result for run '{$item->runId}'");
                             $item->message = $this->getSummarizedMessage($item->dialogName, $item->runId);
+
+                            $this->writeTotalScore($item->dialogName);
                             break;
                     }
                 }
@@ -73,6 +86,24 @@ class Chat
         return null;
     }
 
+    /**
+     * @param string $dialogName
+     * @throws Exception\StorageException
+     */
+    private function writeTotalScore(string $dialogName)
+    {
+        $storage = $this->storage->get();
+
+        if (!isset($storage->results)) {
+            $storage->results = [$dialogName => $this->totalScore];
+            return;
+        }
+
+        if (!isset($storage->results->$dialogName)) {
+            $storage->results->$dialogName = $this->totalScore;
+        }
+    }
+
     protected function getSummarizedMessage($dialogName, $runId)
     {
         $runItems = $this->getConversationItemsByRunId($runId);
@@ -83,6 +114,8 @@ class Chat
         $runsCount = $this->getRunsCount($dialogName);
 
         $timeRepresentation = $this->getTimeRepresentation($time);
+
+        $this->totalScore = $value;
 
         if (1 < $runsCount) {
             return "Попытка <b>#{$runsCount}</b>: вы набрали <b>{$value}</b> баллов из <b>{$maxValue}</b> возможных за <b>{$timeRepresentation}</b>. Количество ответов за которые вы получили баллы: <b>{$correctAnswersCount}</b>.";
